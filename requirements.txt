@@ -1,0 +1,9 @@
+pandas
+nltk
+scikit-learn==1.0.2
+fastapi
+uvicorn
+pydantic
+requests
+beautifulsoup4
+html5lib

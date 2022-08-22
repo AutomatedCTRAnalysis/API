@@ -1,0 +1,6 @@
+{
+    "name": "2aCTI",
+    "description": "A python app to automate the analysis of CTI reports.",
+    "image": "heroku/python",
+    "keywords": ["python"]
+}
