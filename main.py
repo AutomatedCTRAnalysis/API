@@ -338,18 +338,14 @@ def classifier(text):
     # Perform TF-IDF:
     tfidf_input = tfidf_model.transform([text])
     tfidf_input = pd.DataFrame(tfidf_input.toarray(), columns = tfidf_model.get_feature_names())
-    
+
     # Classify report for tactics: 
     result_tactic = tactic_model.predict_proba(tfidf_input)[0]
     result_tactic_dict = dict(zip(tactic_list, result_tactic))
-    print(result_tactic)
-    print(result_tactic_dict)
     result_labels = [x for x, p in result_tactic_dict.items() if p > 0.5]
-    print(result_labels)
-    
+
     # Classify report for techniques:
     result_technique = technique_model.predict(tfidf_input)
-    print('get techniques')  
     result_index_technique = np.flatnonzero(result_technique)
     result_labels_technique = [d_index_to_label_technique[i] for i in result_index_technique]
 
@@ -372,11 +368,8 @@ app = FastAPI(title="2aCTI API",
 
 api_router = APIRouter()
 
-
 class InputReport(BaseModel):
     sentence: str
-
-
 
 def mitre_scraping(overview_response):
     soup = BeautifulSoup(overview_response.content, "html5lib")
@@ -404,6 +397,7 @@ def mitre_scraping(overview_response):
     pass
     d_mitre['description'] = mitre_desc
     d_mitre['techniques'] = technique_id
+    d_mitre['status'] = 'found'
     return d_mitre
 
 app.add_middleware(
@@ -413,15 +407,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
-
-
-    
     
 # /searchattack for search bar
 @api_router.post("/searchattack")
 def search_attack(input_report: InputReport):
     search_keyword = input_report.sentence
     response = requests.get("https://attack.mitre.org/software/")
+    d_mitre = {}
     if response.status_code == 200:
         overview_link = ""
         soup = BeautifulSoup(response.content, "html5lib")
@@ -433,7 +425,8 @@ def search_attack(input_report: InputReport):
         if len(overview_link) > 0:
             overview_request = requests.get(overview_link)
             return mitre_scraping(overview_request)
-        return {'error', 'no links'}
+        else:
+           return {'status': 'not_found'}
 
 # /classification allows to group different models together 
 @api_router.post("/classification")
@@ -443,15 +436,14 @@ def read_classification(input_report: InputReport):
     tactics, techniques, result_tactic_dict, relevant_sents = classifier(input_report.sentence)
     return {'tactics': tactics, 'techniques' : techniques, 'relevant_sents': relevant_sents, 'relevant_tactic_dict': result_tactic_dict} 
 
-
 def load():
     global tactic_model
     global technique_model
     global tfidf_model
     global tfidf_technique
-    with open('tactic_model.pickle', 'rb') as handle:
+    with open('tactic_MLP_TFIDF_model.pickle', 'rb') as handle:
         tactic_model = pickle.load(handle)
-    with open('technique_model.pickle', 'rb') as handle:
+    with open('technique_MLP_TFIDF_50.pickle', 'rb') as handle:
         technique_model = pickle.load(handle)
     with open('tfidf_no_lemma.pickle', 'rb') as handle:
         tfidf_model = pickle.load(handle)
