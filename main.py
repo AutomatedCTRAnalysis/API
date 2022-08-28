@@ -345,9 +345,10 @@ def classifier(text):
     result_labels = [x for x, p in result_tactic_dict.items() if p > 0.5]
 
     # Classify report for techniques:
-    result_technique = technique_model.predict(tfidf_input)
-    result_index_technique = np.flatnonzero(result_technique)
-    result_labels_technique = [d_index_to_label_technique[i] for i in result_index_technique]
+    result_technique = technique_model.predict_proba(tfidf_input)[0]
+    result_technique_dict = dict(zip(technique_list, result_technique))
+    result_labels_technique = [x for x, p in result_technique_dict.items() if p > 0.3]
+
 
     # Find match in report using description model:
     sents = nltk.sent_tokenize(text)
@@ -359,7 +360,7 @@ def classifier(text):
        for tactic in tactic_list:
             relevant_sents[sent] = max(sent_preds.loc[i,tactic], relevant_sents[sent])
                 
-    return result_labels, result_labels_technique, result_tactic_dict, [x for x, y in relevant_sents.most_common(5) if y > 0.3]
+    return result_labels, result_labels_technique, result_tactic_dict, result_technique_dict, [x for x, y in relevant_sents.most_common(5) if y > 0.3]
 
 # Initialize API: 
 app = FastAPI(title="2aCTI API",
@@ -433,8 +434,8 @@ def search_attack(input_report: InputReport):
 def read_classification(input_report: InputReport):
     if tactic_model is None:
         load()
-    tactics, techniques, result_tactic_dict, relevant_sents = classifier(input_report.sentence)
-    return {'tactics': tactics, 'techniques' : techniques, 'relevant_sents': relevant_sents, 'relevant_tactic_dict': result_tactic_dict} 
+    tactics, techniques, result_tactic_dict, result_technique_dict, relevant_sents = classifier(input_report.sentence)
+    return {'tactics': tactics, 'techniques' : techniques, 'relevant_sents': relevant_sents, 'relevant_tactic_dict': result_tactic_dict, 'relevant_technique_dict': result_technique_dict} 
 
 def load():
     global tactic_model
