@@ -29,6 +29,9 @@ technique_model = None
 tfidf_model = None
 tfidf_technique = None
 cv = None
+data = 'tactic_dataset.json'
+with open(data) as file:
+    tactic_data = json.load(file)
 
 def classifier(text):
     
@@ -333,8 +336,6 @@ def classifier(text):
     'T1127',
     'T1077']
     
-    d_index_to_label_technique = dict(zip(technique_model.classes_, technique_list))
-
     # Perform TF-IDF:
     tfidf_input = tfidf_model.transform([text])
     tfidf_input = pd.DataFrame(tfidf_input.toarray(), columns = tfidf_model.get_feature_names())
@@ -347,8 +348,8 @@ def classifier(text):
     # Classify report for techniques:
     result_technique = technique_model.predict_proba(tfidf_input)[0]
     result_technique_dict = dict(zip(technique_list, result_technique))
-    result_labels_technique = [x for x, p in result_technique_dict.items() if p > 0.3]
 
+    _, result_labels_technique = hanging_node(result_tactic_dict, result_technique_dict)
 
     # Find match in report using description model:
     sents = nltk.sent_tokenize(text)
@@ -401,6 +402,21 @@ def mitre_scraping(overview_response):
     d_mitre['status'] = 'found'
     return d_mitre
 
+def hanging_node(tactic_proba, technique_proba,tactic_threshold=0.5, technique_threshold=0.5, a = 1,b = 0, c=1, d=0):
+# see Legoy et al. for the hanging node algorithm
+    assert a > technique_threshold and c > technique_threshold and b < tactic_threshold and d < tactic_threshold
+    pred_tactics = [tactic for tactic in tactic_proba if tactic_proba[tactic] > tactic_threshold]
+    pred_techniques = [technique for technique in technique_proba if technique_proba[technique] > technique_threshold]
+    for tactic in tactic_proba:
+        for technique in tactic_data[tactic]['Technique_ID'][0]:
+            if technique in pred_techniques and tactic not in pred_tactics:
+                if technique_proba[technique] > a and tactic_proba[tactic] > b:
+                    pred_tactics.append(tactic)
+                elif technique_proba[technique] < c and tactic_proba[tactic] < d:
+                    pred_techniques.remove(technique)
+    return pred_tactics, pred_techniques
+    
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -434,7 +450,7 @@ def search_attack(input_report: InputReport):
 def read_classification(input_report: InputReport):
     if tactic_model is None:
         load()
-    tactics, techniques, result_tactic_dict, result_technique_dict, relevant_sents = classifier(input_report.sentence)
+    tactics, techniques, result_tactic_dict, result_technique_dict, relevant_sents = classifier(input_report.sentence)   
     return {'tactics': tactics, 'techniques' : techniques, 'relevant_sents': relevant_sents, 'relevant_tactic_dict': result_tactic_dict, 'relevant_technique_dict': result_technique_dict} 
 
 def load():
@@ -442,12 +458,14 @@ def load():
     global technique_model
     global tfidf_model
     global tfidf_technique
+ 
     with open('tactic_MLP_TFIDF_model.pickle', 'rb') as handle:
         tactic_model = pickle.load(handle)
     with open('technique_MLP_TFIDF_50.pickle', 'rb') as handle:
         technique_model = pickle.load(handle)
     with open('tfidf_no_lemma.pickle', 'rb') as handle:
         tfidf_model = pickle.load(handle)
+
 
 app.include_router(api_router)
 
