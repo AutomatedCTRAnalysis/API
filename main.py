@@ -459,11 +459,11 @@ def load():
     global tfidf_model
     global tfidf_technique
  
-    with open('tactic_MLP_TFIDF_model.pickle', 'rb') as handle:
+    with open('tactic_model.pickle', 'rb') as handle:
         tactic_model = pickle.load(handle)
-    with open('technique_MLP_TFIDF_50.pickle', 'rb') as handle:
+    with open('technique_model.pickle', 'rb') as handle:
         technique_model = pickle.load(handle)
-    with open('tfidf_no_lemma.pickle', 'rb') as handle:
+    with open('tfidf', 'rb') as handle:
         tfidf_model = pickle.load(handle)
 
 
